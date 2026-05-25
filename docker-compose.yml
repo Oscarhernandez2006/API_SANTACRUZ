@@ -5,7 +5,7 @@ services:
     container_name: api-consultas
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8002:8002"
     environment:
       DB_SERVER: ${DB_SERVER}
       DB_PORT: ${DB_PORT}
