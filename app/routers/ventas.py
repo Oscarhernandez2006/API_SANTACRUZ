@@ -29,22 +29,26 @@ def _load_query(name: str) -> str:
 
 
 def _paginate_sql(sql: str) -> str:
-    """Envuelve la query para añadir total y paginación con OFFSET/FETCH."""
-    inner = sql.rstrip().rstrip(";")
-    return f"""
-WITH base AS (
-{inner}
-)
+    """Añade SELECT con COUNT OVER + OFFSET/FETCH a una query que termina en CTE 'data'."""
+    base = sql.rstrip().rstrip(";")
+    return base + """
 SELECT *, COUNT(*) OVER() AS _total_rows
-FROM base
+FROM data
 ORDER BY (SELECT NULL)
 OFFSET :_offset ROWS FETCH NEXT :_limit ROWS ONLY;
 """
 
 
+def _full_sql(sql: str) -> str:
+    """Añade SELECT * FROM data al final de una query que termina en CTE 'data'."""
+    base = sql.rstrip().rstrip(";")
+    return base + "\nSELECT * FROM data;\n"
+
+
 def _stream_csv(db: Session, sql: str, params: dict, filename: str):
     """Ejecuta SQL y devuelve un StreamingResponse en CSV."""
-    result = db.execute(text(sql), params).execution_options(stream_results=True)
+    full = _full_sql(sql)
+    result = db.execute(text(full), params).execution_options(stream_results=True)
     keys = list(result.keys())
 
     def generate():
