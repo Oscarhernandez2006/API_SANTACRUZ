@@ -21,7 +21,7 @@ def _load_query(name: str) -> str:
 
 
 @router.get(
-    "/resumen",
+    "/poscarnes",
     summary="Ventas Diarias POS Carnes",
     description="Resumen diario de ventas del POS de carnes (t9930). Filtros por fecha, compañía, centro operativo y referencia.",
 )
@@ -49,7 +49,7 @@ def ventas_resumen(
 
 
 @router.get(
-    "/carnicos",
+    "/agropecuaria",
     summary="Ventas Diarias Agropecuaria",
     description="Ventas diarias del módulo agropecuario (t470) limitadas a items cárnicos (plan 002, categorías 0001-0005). Divide cantidades en kilos, unidades y otras.",
 )
