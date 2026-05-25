@@ -20,7 +20,11 @@ def _load_query(name: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-@router.get("/resumen")
+@router.get(
+    "/resumen",
+    summary="Ventas Diarias POS Carnes",
+    description="Resumen diario de ventas del POS de carnes (t9930). Filtros por fecha, compañía, centro operativo y referencia.",
+)
 def ventas_resumen(
     fecha_inicio: date = Query(..., description="Fecha inicial (inclusiva), YYYY-MM-DD"),
     fecha_fin: date = Query(..., description="Fecha final (exclusiva), YYYY-MM-DD"),
@@ -44,7 +48,11 @@ def ventas_resumen(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-@router.get("/carnicos")
+@router.get(
+    "/carnicos",
+    summary="Ventas Diarias Agropecuaria",
+    description="Ventas diarias del módulo agropecuario (t470) limitadas a items cárnicos (plan 002, categorías 0001-0005). Divide cantidades en kilos, unidades y otras.",
+)
 def ventas_carnicos(
     fecha_inicio: date = Query(..., description="Fecha inicial (inclusiva), YYYY-MM-DD"),
     fecha_fin: date = Query(..., description="Fecha final (exclusiva), YYYY-MM-DD"),

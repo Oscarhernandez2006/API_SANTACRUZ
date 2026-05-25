@@ -18,7 +18,7 @@ ventas AS (
         m.f470_rowid_item_ext,
         m.f470_id_co_movto                                                      AS id_co,
         CAST(m.f470_id_fecha AS date)                                           AS fecha,
-        m.f470_id_unidad_medida                                                 AS unidad,
+        UPPER(LTRIM(RTRIM(m.f470_id_unidad_medida)))                            AS unidad,
         m.f470_cant_1                                                           AS cantidad,
         m.f470_vlr_bruto - m.f470_vlr_dscto_linea - m.f470_vlr_dscto_global     AS valor_subtotal,
         m.f470_vlr_imp                                                          AS valor_impuestos,
@@ -39,15 +39,18 @@ SELECT
     ic.id_categoria + ' - ' + ic.categoria     AS categoria,
     LTRIM(RTRIM(item.f120_referencia))         AS referencia,
     item.f120_descripcion                      AS descripcion_producto,
-    v.unidad                                   AS unidad,
-    COUNT(*)                                   AS lineas_vendidas,
-    SUM(v.cantidad)                            AS total_cantidad,
+
+    -- Cantidades divididas por unidad de medida
+    SUM(CASE WHEN v.unidad IN ('KG','KL','LB') THEN v.cantidad ELSE 0 END) AS kilos_vendidos,
+    SUM(CASE WHEN v.unidad IN ('U','UN','PK')  THEN v.cantidad ELSE 0 END) AS unidades_vendidas,
+    SUM(CASE WHEN v.unidad NOT IN ('KG','KL','LB','U','UN','PK') THEN v.cantidad ELSE 0 END) AS otras_cantidades,
+
+    COUNT(*)                                   AS lineas_facturadas,
     SUM(v.valor_subtotal)                      AS total_subtotal,
     SUM(v.valor_impuestos)                     AS total_impuestos,
     SUM(v.valor_neto)                          AS total_neto,
     SUM(v.costo_total)                         AS total_costo,
-    SUM(v.valor_neto - v.costo_total)          AS utilidad_bruta,
-    CAST(SUM(v.valor_neto) / NULLIF(SUM(v.cantidad), 0) AS decimal(18,2)) AS precio_promedio
+    SUM(v.valor_neto - v.costo_total)          AS utilidad_bruta
 FROM ventas v
 INNER JOIN dbo.t121_mc_items_extensiones ext  ON v.f470_rowid_item_ext = ext.f121_rowid
 INNER JOIN dbo.t120_mc_items             item ON ext.f121_rowid_item   = item.f120_rowid
@@ -62,7 +65,6 @@ GROUP BY
     co.f285_id, co.f285_descripcion,
     v.fecha,
     ic.id_categoria, ic.categoria,
-    item.f120_referencia, item.f120_descripcion,
-    v.unidad
+    item.f120_referencia, item.f120_descripcion
 ORDER BY 
     v.f470_id_cia, co.f285_id, v.fecha, categoria, item.f120_descripcion;

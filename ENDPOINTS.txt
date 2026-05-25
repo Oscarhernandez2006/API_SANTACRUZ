@@ -1,0 +1,163 @@
+﻿================================================================
+   API CONSULTAS - CARNES SANTA CRUZ
+   Endpoints disponibles y ejemplos de uso
+================================================================
+
+BASE URL (producción):
+  https://apiconsulta.grupo-santacruz.com
+
+Documentación interactiva (Swagger):
+  https://apiconsulta.grupo-santacruz.com/docs
+
+----------------------------------------------------------------
+ 1. ESTADO DEL SERVICIO
+----------------------------------------------------------------
+
+GET /
+  Verifica que la API está arriba.
+  Respuesta:
+    {"status":"ok","service":"API Consultas"}
+
+  Ejemplo:
+    https://apiconsulta.grupo-santacruz.com/
+
+
+GET /health/db
+  Verifica conexión a la base de datos SQL Server.
+  Respuesta:
+    {"db":"ok","result":1}
+
+  Ejemplo:
+    https://apiconsulta.grupo-santacruz.com/health/db
+
+
+----------------------------------------------------------------
+ 2. VENTAS RESUMEN (POS - tabla t9930)
+----------------------------------------------------------------
+
+GET /ventas/resumen
+  Ventas registradas en el módulo de PDV (Punto de Venta).
+  Agrupado por: compañía, centro operación, fecha, producto, unidad.
+
+  PARÁMETROS:
+    fecha_inicio   (requerido)  Fecha inicial, formato YYYY-MM-DD
+    fecha_fin      (requerido)  Fecha final EXCLUSIVA, formato YYYY-MM-DD
+    id_cia         (opcional)   Código compañía: 4, 5, 6, 7
+    id_co          (opcional)   Código centro operación, ej: 402
+    referencia     (opcional)   Referencia producto, ej: 4003
+
+  CAMPOS DEVUELTOS:
+    id_cia, compania, id_co, desc_co, fecha,
+    referencia, descripcion_producto, unidad,
+    lineas_vendidas, total_cantidad, total_subtotal,
+    total_impuestos, total_neto, total_costo,
+    utilidad_bruta, precio_promedio
+
+  EJEMPLOS:
+
+  - Un día, todas las compañías:
+    https://apiconsulta.grupo-santacruz.com/ventas/resumen?fecha_inicio=2026-04-01&fecha_fin=2026-04-02
+
+  - Abril completo, compañía 4:
+    https://apiconsulta.grupo-santacruz.com/ventas/resumen?fecha_inicio=2026-04-01&fecha_fin=2026-05-01&id_cia=4
+
+  - Un día, compañía 4, centro 402:
+    https://apiconsulta.grupo-santacruz.com/ventas/resumen?fecha_inicio=2026-04-01&fecha_fin=2026-04-02&id_cia=4&id_co=402
+
+  - Producto específico:
+    https://apiconsulta.grupo-santacruz.com/ventas/resumen?fecha_inicio=2026-04-01&fecha_fin=2026-04-02&referencia=4003
+
+  - Producto específico en una sede:
+    https://apiconsulta.grupo-santacruz.com/ventas/resumen?fecha_inicio=2026-04-01&fecha_fin=2026-04-30&id_cia=4&id_co=402&referencia=4003
+
+
+----------------------------------------------------------------
+ 3. VENTAS CARNICOS (Movto invent - tabla t470, solo cárnicos)
+----------------------------------------------------------------
+
+GET /ventas/carnicos
+  Ventas registradas en el módulo de movimientos de inventario
+  FILTRADAS por items clasificados como cárnicos en el plan '002':
+    0001 - RES
+    0002 - CERDO
+    0003 - POLLO
+    0004 - PESCADO
+    0005 - CARNES FRIAS
+
+  PARÁMETROS:
+    fecha_inicio   (REQUERIDO)  Fecha inicial, YYYY-MM-DD
+    fecha_fin      (REQUERIDO)  Fecha final EXCLUSIVA, YYYY-MM-DD
+    id_cia         (REQUERIDO)  Código compañía: 3, 4, 5, 6, 7
+    id_co          (opcional)   Código centro operación
+    referencia     (opcional)   Referencia producto
+
+  CAMPOS DEVUELTOS:
+    id_cia, compania, id_co, desc_co, fecha,
+    categoria (ej: "0001 - RES"),
+    referencia, descripcion_producto, unidad,
+    lineas_vendidas, total_cantidad, total_subtotal,
+    total_impuestos, total_neto, total_costo,
+    utilidad_bruta, precio_promedio
+
+  EJEMPLOS:
+
+  - Abril completo, compañía 3:
+    https://apiconsulta.grupo-santacruz.com/ventas/carnicos?fecha_inicio=2026-04-01&fecha_fin=2026-05-01&id_cia=3
+
+  - Abril, compañía 4, centro 402:
+    https://apiconsulta.grupo-santacruz.com/ventas/carnicos?fecha_inicio=2026-04-01&fecha_fin=2026-05-01&id_cia=4&id_co=402
+
+  - Producto específico:
+    https://apiconsulta.grupo-santacruz.com/ventas/carnicos?fecha_inicio=2026-04-01&fecha_fin=2026-04-30&id_cia=4&referencia=4003
+
+
+================================================================
+ NOTAS IMPORTANTES
+================================================================
+
+1. FECHA EXCLUSIVA:
+   "fecha_fin" NO se incluye en el resultado.
+   Para "todo abril 2026" usa:
+     fecha_inicio=2026-04-01 & fecha_fin=2026-05-01
+
+2. FORMATO RESPUESTA:
+   Siempre JSON:
+     {
+       "count": <numero_de_filas>,
+       "data":  [ {...fila...}, {...fila...} ]
+     }
+
+3. ERRORES:
+   - 422  -> Falta un parámetro requerido o tiene formato inválido
+   - 500  -> Error en la consulta SQL o conexión a la DB
+            (mensaje detallado en el campo "detail")
+
+4. PRUEBAS:
+   Usa Swagger UI para probar sin armar URLs:
+     https://apiconsulta.grupo-santacruz.com/docs
+
+5. COMPAÑÍAS CONOCIDAS:
+     3 - (verificar)
+     4 - CARNES SANTACRUZ S.A.S
+     5 - (verificar)
+     6 - (verificar)
+     7 - (verificar)
+
+================================================================
+ IDEAS DE PRÓXIMOS ENDPOINTS (no implementados aún)
+================================================================
+
+- /ventas/top-productos        TOP N productos más vendidos
+- /ventas/por-vendedor         Ventas agrupadas por vendedor/cajero
+- /ventas/por-hora             Ventas por franja horaria (heatmap)
+- /ventas/comparativo          Comparar dos rangos de fechas
+- /inventario/stock            Stock actual por bodega
+- /inventario/movimientos      Movimientos entrada/salida
+- /compras/resumen             Compras a proveedores
+- /clientes/top                Top clientes por monto
+- /cartera/saldos              Saldos pendientes por cliente
+- /produccion/ordenes          Órdenes de producción del periodo
+
+Dile a Copilot qué consulta SQL nueva quieres y la añadimos.
+
+================================================================
