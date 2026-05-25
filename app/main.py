@@ -1,4 +1,5 @@
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -6,6 +7,9 @@ from .database import get_db
 from .routers import ventas
 
 app = FastAPI(title="API Consultas - Carnes Santa Cruz")
+
+# Compresión automática (gzip) para todas las respuestas > 1KB
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.include_router(ventas.router)
 
