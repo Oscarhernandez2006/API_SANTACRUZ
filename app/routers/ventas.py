@@ -48,7 +48,8 @@ def _full_sql(sql: str) -> str:
 def _stream_csv(db: Session, sql: str, params: dict, filename: str):
     """Ejecuta SQL y devuelve un StreamingResponse en CSV."""
     full = _full_sql(sql)
-    result = db.execute(text(full), params).execution_options(stream_results=True)
+    stmt = text(full).execution_options(stream_results=True, yield_per=CSV_CHUNK_SIZE)
+    result = db.execute(stmt, params)
     keys = list(result.keys())
 
     def generate():
