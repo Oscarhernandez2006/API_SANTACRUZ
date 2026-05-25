@@ -42,3 +42,27 @@ def ventas_resumen(
         return {"count": len(rows), "data": [dict(r) for r in rows]}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/carnicos")
+def ventas_carnicos(
+    fecha_inicio: date = Query(..., description="Fecha inicial (inclusiva), YYYY-MM-DD"),
+    fecha_fin: date = Query(..., description="Fecha final (exclusiva), YYYY-MM-DD"),
+    id_cia: int = Query(..., description="Código compañía (3,4,5,6,7). Requerido"),
+    id_co: Optional[str] = Query(None, description="Código centro operación. Omitir = todos"),
+    referencia: Optional[str] = Query(None, description="Referencia producto. Omitir = todas"),
+    db: Session = Depends(get_db),
+):
+    sql = _load_query("ventas_carnicos.sql")
+    params = {
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "id_cia": id_cia,
+        "id_co": id_co,
+        "referencia": referencia,
+    }
+    try:
+        rows = db.execute(text(sql), params).mappings().all()
+        return {"count": len(rows), "data": [dict(r) for r in rows]}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
