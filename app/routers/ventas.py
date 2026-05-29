@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from ..auth import require_scope
 from ..database import get_db
 
 router = APIRouter(prefix="/ventas", tags=["ventas"])
@@ -105,6 +106,7 @@ def _run_paginated(db: Session, sql: str, params: dict, limit: int, offset: int)
         "Resumen diario de ventas del POS de carnes (t9930). "
         "Soporta paginación (limit/offset) y descarga CSV (format=csv)."
     ),
+    dependencies=[Depends(require_scope("ventas"))],
 )
 def ventas_poscarnes(
     fecha_inicio: date = Query(..., description="Fecha inicial (inclusiva), YYYY-MM-DD"),
@@ -148,6 +150,7 @@ def ventas_poscarnes(
         "Ventas diarias del módulo agropecuario (t470) con grupo, especie, proceso, "
         "vendedor y cliente. Soporta paginación (limit/offset) y descarga CSV (format=csv)."
     ),
+    dependencies=[Depends(require_scope("ventas"))],
 )
 def ventas_agropecuaria(
     fecha_inicio: date = Query(..., description="Fecha inicial (inclusiva), YYYY-MM-DD"),

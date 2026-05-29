@@ -60,6 +60,8 @@ data AS (
         COALESCE(ip.id_proceso + ' - ' + ip.proceso, 'SIN PROCESO') AS proceso,
         tv.f200_id                                                 AS codigo_vendedor,
         tv.f200_razon_social                                       AS nombre_vendedor,
+        LTRIM(RTRIM(v210.f210_id_clase_vend))                      AS id_clase_vendedor,
+        cv.f2102_descripcion                                       AS desc_clase_vendedor,
         tc.f200_id                                                 AS codigo_cliente,
         tc.f200_nit                                                AS nit_cliente,
         tc.f200_razon_social                                       AS nombre_cliente,
@@ -88,6 +90,11 @@ data AS (
     INNER JOIN dbo.t010_mm_companias         cia  ON v.f470_id_cia         = cia.f010_id
     LEFT  JOIN dbo.t285_co_centro_op         co   ON co.f285_id_cia = v.f470_id_cia AND co.f285_id = v.id_co
     LEFT  JOIN dbo.t200_mm_terceros          tv   ON tv.f200_rowid = v.rowid_vendedor AND tv.f200_id_cia = v.f470_id_cia
+    -- Clase del vendedor (CCT/MAY/OFI/TAT)
+    LEFT  JOIN dbo.t210_mm_vendedores        v210 ON v210.f210_id_cia       = v.f470_id_cia 
+                                                 AND v210.f210_rowid_tercero = v.rowid_vendedor
+    LEFT  JOIN dbo.t2102_mm_clases_vendedor  cv   ON cv.f2102_id_cia = v210.f210_id_cia
+                                                 AND LTRIM(RTRIM(cv.f2102_id)) = LTRIM(RTRIM(v210.f210_id_clase_vend))
     -- Cliente desde cabecera de factura de venta (t461)
     LEFT  JOIN dbo.t461_cm_docto_factura_venta fact ON fact.f461_rowid_docto = v.rowid_docto_fact 
                                                     AND fact.f461_id_cia      = v.f470_id_cia
@@ -104,5 +111,6 @@ data AS (
         ie.id_especie, ie.especie,
         ip.id_proceso, ip.proceso,
         tv.f200_id, tv.f200_razon_social,
+        v210.f210_id_clase_vend, cv.f2102_descripcion,
         tc.f200_id, tc.f200_nit, tc.f200_razon_social
 )
