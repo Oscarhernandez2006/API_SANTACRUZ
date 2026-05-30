@@ -1,116 +1,83 @@
-;WITH 
-items_especie AS (
-    SELECT DISTINCT ic.f125_rowid_item, cat.f106_id AS id_especie, cat.f106_descripcion AS especie
-    FROM dbo.t125_mc_items_criterios ic
-    INNER JOIN dbo.t106_mc_criterios_item_mayores cat 
-            ON cat.f106_id_plan = ic.f125_id_plan AND cat.f106_id = ic.f125_id_criterio_mayor
-    WHERE ic.f125_id_plan = '002' AND cat.f106_id_cia = :id_cia
-      AND cat.f106_id IN ('0001','0002','0003','0004','0005')
-),
-items_proceso AS (
-    SELECT DISTINCT ic.f125_rowid_item, cat.f106_id AS id_proceso, cat.f106_descripcion AS proceso
-    FROM dbo.t125_mc_items_criterios ic
-    INNER JOIN dbo.t106_mc_criterios_item_mayores cat 
-            ON cat.f106_id_plan = ic.f125_id_plan AND cat.f106_id = ic.f125_id_criterio_mayor
-    WHERE ic.f125_id_plan = '003' AND cat.f106_id_cia = :id_cia
-),
-items_grupo AS (
-    SELECT DISTINCT ic.f125_rowid_item, cat.f106_id AS id_grupo, cat.f106_descripcion AS grupo
-    FROM dbo.t125_mc_items_criterios ic
-    INNER JOIN dbo.t106_mc_criterios_item_mayores cat 
-            ON cat.f106_id_plan = ic.f125_id_plan AND cat.f106_id = ic.f125_id_criterio_mayor
-    WHERE ic.f125_id_plan = '001' AND cat.f106_id_cia = :id_cia
-),
-ventas AS (
-    SELECT 
-        m.f470_id_cia,
-        m.f470_rowid_item_ext,
-        m.f470_id_co_movto                  AS id_co,
-        m.f470_rowid_tercero_vend           AS rowid_vendedor,
-        m.f470_rowid_docto                  AS rowid_docto,
-        m.f470_rowid_docto_fact             AS rowid_docto_fact,
-        CAST(m.f470_id_fecha AS date)       AS fecha,
-        UPPER(LTRIM(RTRIM(m.f470_id_unidad_medida))) AS unidad,
-        m.f470_cant_1                       AS cantidad,
-        m.f470_vlr_bruto - m.f470_vlr_dscto_linea - m.f470_vlr_dscto_global AS valor_subtotal,
-        m.f470_vlr_imp                      AS valor_impuestos,
-        m.f470_vlr_neto                     AS valor_neto,
-        m.f470_costo_prom_tot               AS costo_total
-    FROM dbo.t470_cm_movto_invent m
-    WHERE m.f470_ind_naturaleza = 2
-      AND m.f470_id_fecha >= :fecha_inicio
-      AND m.f470_id_fecha <  :fecha_fin
-      AND (:id_cia IS NULL OR m.f470_id_cia = :id_cia)
-),
-data AS (
-    SELECT 
-        v.f470_id_cia                                              AS id_cia,
-        cia.f010_razon_social                                      AS compania,
-        co.f285_id                                                 AS id_co,
-        co.f285_descripcion                                        AS desc_co,
-        v.fecha                                                    AS fecha,
-        YEAR(v.fecha)                                              AS anio,
-        MONTH(v.fecha)                                             AS mes,
-        LTRIM(RTRIM(item.f120_referencia))                         AS referencia,
-        item.f120_descripcion                                      AS descripcion_producto,
-        CASE WHEN ig.id_grupo = '0001' THEN 'BIENES'
-             WHEN ig.id_grupo = '0002' THEN 'SERVICIOS'
-             ELSE ig.grupo END                                     AS tipo_bien_servicio,
-        COALESCE(ie.id_especie + ' - ' + ie.especie, 'SIN ESPECIE') AS especie,
-        COALESCE(ip.id_proceso + ' - ' + ip.proceso, 'SIN PROCESO') AS proceso,
-        tv.f200_id                                                 AS codigo_vendedor,
-        tv.f200_razon_social                                       AS nombre_vendedor,
-        LTRIM(RTRIM(v210.f210_id_clase_vend))                      AS id_clase_vendedor,
-        cv.f2102_descripcion                                       AS desc_clase_vendedor,
-        tc.f200_id                                                 AS codigo_cliente,
-        tc.f200_nit                                                AS nit_cliente,
-        tc.f200_razon_social                                       AS nombre_cliente,
-        SUM(CASE WHEN v.unidad IN ('KG','KL','LB') THEN v.cantidad ELSE 0 END) AS kilos_vendidos,
-        SUM(CASE WHEN v.unidad IN ('U','UN','PK')  THEN v.cantidad ELSE 0 END) AS unidades_vendidas,
-        SUM(CASE WHEN v.unidad NOT IN ('KG','KL','LB','U','UN','PK') THEN v.cantidad ELSE 0 END) AS otras_cantidades,
-        COUNT(*)                                                   AS lineas_facturadas,
-        SUM(v.valor_subtotal)                                      AS total_subtotal,
-        SUM(v.valor_impuestos)                                     AS total_impuestos,
-        SUM(v.valor_neto)                                          AS total_neto,
-        SUM(v.costo_total)                                         AS total_costo,
-        SUM(v.valor_neto - v.costo_total)                          AS utilidad_bruta,
-        CAST(
-            CASE WHEN SUM(CASE WHEN v.unidad IN ('KG','KL','LB') THEN v.cantidad ELSE 0 END) > 0
-                 THEN SUM(CASE WHEN v.unidad IN ('KG','KL','LB') THEN v.valor_neto ELSE 0 END)
-                      / SUM(CASE WHEN v.unidad IN ('KG','KL','LB') THEN v.cantidad ELSE 0 END)
-                 ELSE 0 END
-            AS decimal(18,2)
-        )                                                          AS precio_promedio_kilo
-    FROM ventas v
-    INNER JOIN dbo.t121_mc_items_extensiones ext  ON v.f470_rowid_item_ext = ext.f121_rowid
-    INNER JOIN dbo.t120_mc_items             item ON ext.f121_rowid_item   = item.f120_rowid
-    INNER JOIN items_grupo                   ig   ON ig.f125_rowid_item    = item.f120_rowid
-    LEFT  JOIN items_especie                 ie   ON ie.f125_rowid_item    = item.f120_rowid
-    LEFT  JOIN items_proceso                 ip   ON ip.f125_rowid_item    = item.f120_rowid
-    INNER JOIN dbo.t010_mm_companias         cia  ON v.f470_id_cia         = cia.f010_id
-    LEFT  JOIN dbo.t285_co_centro_op         co   ON co.f285_id_cia = v.f470_id_cia AND co.f285_id = v.id_co
-    LEFT  JOIN dbo.t200_mm_terceros          tv   ON tv.f200_rowid = v.rowid_vendedor AND tv.f200_id_cia = v.f470_id_cia
-    -- Clase del vendedor (CCT/MAY/OFI/TAT)
-    LEFT  JOIN dbo.t210_mm_vendedores        v210 ON v210.f210_id_cia       = v.f470_id_cia 
-                                                 AND v210.f210_rowid_tercero = v.rowid_vendedor
-    LEFT  JOIN dbo.t2102_mm_clases_vendedor  cv   ON cv.f2102_id_cia = v210.f210_id_cia
-                                                 AND LTRIM(RTRIM(cv.f2102_id)) = LTRIM(RTRIM(v210.f210_id_clase_vend))
-    -- Cliente desde cabecera de factura de venta (t461)
-    LEFT  JOIN dbo.t461_cm_docto_factura_venta fact ON fact.f461_rowid_docto = v.rowid_docto_fact 
-                                                    AND fact.f461_id_cia      = v.f470_id_cia
-    LEFT  JOIN dbo.t200_mm_terceros          tc   ON tc.f200_rowid   = fact.f461_rowid_tercero_fact 
-                                                  AND tc.f200_id_cia = v.f470_id_cia
-    WHERE (:id_co      IS NULL OR LTRIM(RTRIM(co.f285_id))           = LTRIM(RTRIM(CAST(:id_co AS varchar(10)))))
-      AND (:referencia IS NULL OR LTRIM(RTRIM(item.f120_referencia)) = LTRIM(RTRIM(CAST(:referencia AS varchar(20)))))
-    GROUP BY 
-        v.f470_id_cia, cia.f010_razon_social,
-        co.f285_id, co.f285_descripcion,
-        v.fecha,
-        item.f120_referencia, item.f120_descripcion,
-        ig.id_grupo, ig.grupo,
-        ie.id_especie, ie.especie,
-        ip.id_proceso, ip.proceso,
-        tv.f200_id, tv.f200_razon_social,
-        v210.f210_id_clase_vend, cv.f2102_descripcion,
-        tc.f200_id, tc.f200_nit, tc.f200_razon_social
+-- =====================================================================
+-- REPORTE GERENCIAL DE VENTAS (Grand Total Siesa) - Carnes Santa Cruz
+-- Fuente: t461 (cabecera factura) + t470 (detalle facturado)
+-- Jerarquia: C.O. -> Tipo item -> Especie -> Tipo comercial -> Item
+--            -> Cliente -> Grupo ABC
+-- Termina en CTE 'data'; el router agrega paginacion / CSV / ORDER BY.
+-- Parametros: :id_cia, :id_co, :fecha_inicio, :fecha_fin, :referencia
+-- NOTA: :fecha_fin es INCLUSIVA (usa DATEADD(DAY,1,...) internamente).
+-- =====================================================================
+;WITH data AS (
+    SELECT
+        -- ===== Jerarquia =====
+        f.f461_id_co_docto                              AS CO_Id,
+        co.f285_descripcion                             AS CentroOperacion,
+        pTipo.f106_id                                   AS TipoItem_Id,
+        pTipo.f106_descripcion                          AS TipoItem,
+        pEsp.f106_id                                    AS Especie_Id,
+        pEsp.f106_descripcion                           AS Especie,
+        pCom.f106_id                                    AS TipoComercial_Id,
+        pCom.f106_descripcion                           AS TipoComercial,
+        it.f120_referencia                              AS Item_Ref,
+        it.f120_descripcion                             AS Item_Desc,
+        ter.f200_razon_social                           AS Cliente,
+        pGru.f106_id                                    AS Grupo_Id,
+        pGru.f106_descripcion                           AS Grupo,
+        -- ===== Medidas (con signo: venta + / devolucion-NC -) =====
+        SUM(s.signo * m.f470_cant_base)                                                   AS CantidadInv,
+        SUM(s.signo * m.f470_vlr_bruto)                                                   AS ValorBruto,
+        SUM(s.signo * (m.f470_vlr_bruto - m.f470_vlr_dscto_linea - m.f470_vlr_dscto_global)) AS ValorSubtotal,
+        SUM(s.signo * (m.f470_vlr_dscto_linea + m.f470_vlr_dscto_global))                 AS Descuentos,
+        SUM(s.signo * m.f470_cant_1)                                                      AS KilosTotal
+    FROM dbo.t461_cm_docto_factura_venta f
+    JOIN dbo.t470_cm_movto_invent m
+           ON  m.f470_id_cia            = f.f461_id_cia
+           AND m.f470_rowid_docto_fact  = f.f461_rowid_docto
+    -- Centro de operacion (cabecera)
+    LEFT JOIN dbo.t285_co_centro_op co
+           ON  co.f285_id_cia = f.f461_id_cia
+           AND co.f285_id     = f.f461_id_co_docto
+    -- Item y su extension
+    JOIN dbo.t121_mc_items_extensiones e
+           ON  e.f121_id_cia = m.f470_id_cia
+           AND e.f121_rowid  = m.f470_rowid_item_ext
+    JOIN dbo.t120_mc_items it
+           ON  it.f120_rowid = e.f121_rowid_item
+    -- Cliente de la factura (tercero -> razon social)
+    LEFT JOIN dbo.t200_mm_terceros ter
+           ON  ter.f200_rowid = f.f461_rowid_tercero_fact
+    -- ===== Criterios de item (planes) =====
+    LEFT JOIN dbo.t125_mc_items_criterios crTipo
+           ON crTipo.f125_id_cia = e.f121_id_cia AND crTipo.f125_rowid_item = e.f121_rowid_item AND crTipo.f125_id_plan = '001'
+    LEFT JOIN dbo.t106_mc_criterios_item_mayores pTipo
+           ON pTipo.f106_id_cia = :id_cia AND pTipo.f106_id_plan = '001' AND pTipo.f106_id = crTipo.f125_id_criterio_mayor
+    LEFT JOIN dbo.t125_mc_items_criterios crEsp
+           ON crEsp.f125_id_cia = e.f121_id_cia AND crEsp.f125_rowid_item = e.f121_rowid_item AND crEsp.f125_id_plan = '002'
+    LEFT JOIN dbo.t106_mc_criterios_item_mayores pEsp
+           ON pEsp.f106_id_cia = :id_cia AND pEsp.f106_id_plan = '002' AND pEsp.f106_id = crEsp.f125_id_criterio_mayor
+    LEFT JOIN dbo.t125_mc_items_criterios crCom
+           ON crCom.f125_id_cia = e.f121_id_cia AND crCom.f125_rowid_item = e.f121_rowid_item AND crCom.f125_id_plan = '003'
+    LEFT JOIN dbo.t106_mc_criterios_item_mayores pCom
+           ON pCom.f106_id_cia = :id_cia AND pCom.f106_id_plan = '003' AND pCom.f106_id = crCom.f125_id_criterio_mayor
+    LEFT JOIN dbo.t125_mc_items_criterios crGru
+           ON crGru.f125_id_cia = e.f121_id_cia AND crGru.f125_rowid_item = e.f121_rowid_item AND crGru.f125_id_plan = '004'
+    LEFT JOIN dbo.t106_mc_criterios_item_mayores pGru
+           ON pGru.f106_id_cia = :id_cia AND pGru.f106_id_plan = '004' AND pGru.f106_id = crGru.f125_id_criterio_mayor
+    -- Signo: naturaleza 2 = venta (+), 1 = devolucion/NC (-)
+    CROSS APPLY (SELECT CASE WHEN m.f470_ind_naturaleza = 2 THEN 1 ELSE -1 END) s(signo)
+    WHERE f.f461_id_cia        = :id_cia
+      AND f.f461_id_fecha      >= :fecha_inicio
+      AND f.f461_id_fecha      <  DATEADD(DAY, 1, :fecha_fin)
+      AND m.f470_ind_estado_cm  = 5                     -- lineas confirmadas
+      AND (:id_co IS NULL OR f.f461_id_co_docto = :id_co)
+      AND (:referencia IS NULL OR LTRIM(RTRIM(it.f120_referencia)) = LTRIM(RTRIM(CAST(:referencia AS varchar(20)))))
+      AND it.f120_referencia NOT IN ('99086','99031')   -- excluir arriendo de canastillas
+    GROUP BY
+        f.f461_id_co_docto, co.f285_descripcion,
+        pTipo.f106_id, pTipo.f106_descripcion,
+        pEsp.f106_id,  pEsp.f106_descripcion,
+        pCom.f106_id,  pCom.f106_descripcion,
+        it.f120_referencia, it.f120_descripcion,
+        ter.f200_razon_social,
+        pGru.f106_id,  pGru.f106_descripcion
 )
