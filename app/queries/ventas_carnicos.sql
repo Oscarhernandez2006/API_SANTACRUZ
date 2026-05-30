@@ -4,8 +4,8 @@
 -- Jerarquia: C.O. -> Tipo item -> Especie -> Tipo comercial -> Item
 --            -> Cliente -> Grupo ABC
 -- Termina en CTE 'data'; el router agrega paginacion / CSV / ORDER BY.
--- Parametros: :id_cia, :id_co, :fecha_inicio, :fecha_fin, :referencia
--- NOTA: :fecha_fin es INCLUSIVA (usa DATEADD(DAY,1,...) internamente).
+-- Parametros: id_cia, id_co, fecha_inicio, fecha_fin, referencia
+-- NOTA: fecha_fin es INCLUSIVA (usa DATEADD(DAY,1,...) internamente).
 -- =====================================================================
 ;WITH data AS (
     SELECT
